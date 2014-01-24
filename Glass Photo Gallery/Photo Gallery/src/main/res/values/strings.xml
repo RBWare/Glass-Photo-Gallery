@@ -1,9 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <string name="app_name">Glass Photo Gallery</string>
-
-    <string name="voice_trigger">open my gallery</string>
+    <string name="glass_app_name">Photo Gallery</string>
+    <string name="voice_trigger_command">open my gallery</string>
 
     <string name="action_play">Play</string>
     <string name="action_share">Share</string>

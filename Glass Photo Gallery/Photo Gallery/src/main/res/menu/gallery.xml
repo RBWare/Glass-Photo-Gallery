@@ -12,7 +12,8 @@
         android:title="@string/action_share"
         android:icon="@drawable/ic_share_50"
         android:orderInCategory="200"
-        android:showAsAction="ifRoom" />
+        android:showAsAction="ifRoom"
+        android:visible="false"/>
 
     <item android:id="@+id/action_details"
           android:title="@string/action_details"

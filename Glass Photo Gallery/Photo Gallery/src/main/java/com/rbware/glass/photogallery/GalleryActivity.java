@@ -1,11 +1,13 @@
 package com.rbware.glass.photogallery;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioManager;
 import android.media.ThumbnailUtils;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -13,12 +15,9 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
+import android.view.*;
 import android.widget.*;
+import com.google.android.glass.media.Sounds;
 import com.google.android.glass.widget.CardScrollAdapter;
 import com.google.android.glass.widget.CardScrollView;
 
@@ -33,15 +32,19 @@ public class GalleryActivity extends Activity {
     private int mSelectedListing;
     private UIListingCardScrollAdapter mAdapter;
     private CardScrollView mCardScrollView;
+    private TextView mNoMediaFound;
+    private View infoView;
+    private RelativeLayout mainLayoutContainer;
     private boolean showPlayButtonInMenu;
+
+    private boolean isShowingDeleteOverlay = false;
+    private boolean isShowingInfoOverlay = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        View rootLayout = getLayoutInflater().inflate(R.layout.activity_gallery, null);
-        setupPhotoListView(rootLayout);
-        setContentView(rootLayout);
+        setContentView(R.layout.activity_gallery);
+        setupPhotoListView();
     }
 
 
@@ -63,6 +66,20 @@ public class GalleryActivity extends Activity {
     }
 
     @Override
+    public void onBackPressed() {
+        if(isShowingInfoOverlay){
+            if (mainLayoutContainer != null && infoView != null)
+                mainLayoutContainer.removeView(infoView);
+
+            isShowingInfoOverlay = false;
+            AudioManager audio = (AudioManager) GalleryActivity.this.getSystemService(Context.AUDIO_SERVICE);
+            audio.playSoundEffect(Sounds.DISMISSED);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
 
         switch(item.getItemId()){
@@ -75,20 +92,20 @@ public class GalleryActivity extends Activity {
 //                startActivity(intent);
                 return true;
             case R.id.action_delete:
-
+                new DeletePhoto().execute(mFileList.get(mSelectedListing).getName());
                 return true;
             case R.id.action_details:
-
+                showFileDetails(mFileList.get(mSelectedListing));
                 return true;
             case R.id.action_share:
                 Intent sharingIntent;
                 if (showPlayButtonInMenu){
-//                    sharingIntent = new Intent(Intent.ACTION_SEND);
-//                    sharingIntent.setType("image/*");
-//                    sharingIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(mFileList.get(mSelectedListing).getAbsolutePath()));
-//                    startActivity(Intent.createChooser(sharingIntent, ""));
+                    sharingIntent = new Intent(Intent.ACTION_SEND);
+                    sharingIntent.setType("video/*");
+                    sharingIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(mFileList.get(mSelectedListing).getAbsolutePath()));
+                    startActivity(Intent.createChooser(sharingIntent, ""));
                 } else {
-                    sharingIntent = new Intent(Intent.ACTION_MEDIA_SHARED);
+                    sharingIntent = new Intent(Intent.ACTION_SEND);
                     sharingIntent.setType("image/*");
                     sharingIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(mFileList.get(mSelectedListing).getAbsolutePath()));
                     startActivity(Intent.createChooser(sharingIntent, ""));
@@ -102,7 +119,7 @@ public class GalleryActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
-    private void setupPhotoListView(View rootLayout){
+    private void setupPhotoListView(){
 
         File sdcard = Environment.getExternalStorageDirectory();
         File photoDirectory = new File(sdcard, "/DCIM/Camera");
@@ -111,35 +128,65 @@ public class GalleryActivity extends Activity {
         }
 
 
+        mCardScrollView = (CardScrollView)findViewById(R.id.card_scroll_view);
+
         if(!mFileList.isEmpty()){
             mAdapter = new UIListingCardScrollAdapter();
-            if (mCardScrollView == null){
-                mCardScrollView = (CardScrollView)rootLayout.findViewById(R.id.card_scroll_view);
-                mCardScrollView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                    @Override
-                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                        mSelectedListing = position;
+            mCardScrollView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    mSelectedListing = position;
 
-                        if (mFileList.get(mSelectedListing).getName().toLowerCase().endsWith(".mp4"))
-                            showPlayButtonInMenu = true;
-                        else
-                            showPlayButtonInMenu = false;
+                    if (isShowingDeleteOverlay)
+                        return;
 
-                        Log.e("Filename", "Name: " + mFileList.get(mSelectedListing).getName());
-                        Log.e("Show play", "Value: " + showPlayButtonInMenu);
+                    if (isShowingInfoOverlay) {
+                        if (mainLayoutContainer != null && infoView != null)
+                            mainLayoutContainer.removeView(infoView);
 
-                        GalleryActivity.super.openOptionsMenu();
+                        isShowingInfoOverlay = false;
+                        return;
                     }
-                });
-            }
-            mCardScrollView.setVisibility(View.VISIBLE);
 
+                    if (mFileList.get(mSelectedListing).getName().toLowerCase().endsWith(".mp4"))
+                        showPlayButtonInMenu = true;
+                    else
+                        showPlayButtonInMenu = false;
+
+                    GalleryActivity.super.openOptionsMenu();
+
+                }
+            });
+            mCardScrollView.setVisibility(View.VISIBLE);
             mCardScrollView.setAdapter(mAdapter);
             mCardScrollView.activate();
         } else {
-
-
+            mCardScrollView.setVisibility(View.GONE);
+            mNoMediaFound = (TextView)findViewById(R.id.noMediaFound);
+            mNoMediaFound.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void showFileDetails(File currentFile){
+        isShowingInfoOverlay = true;
+
+        mainLayoutContainer = (RelativeLayout)findViewById(R.id.container);
+        infoView = getLayoutInflater().inflate(R.layout.info_overlay, null);
+
+        TextView photoName = (TextView)infoView.findViewById(R.id.info_overlay_textview_photo_name);
+        TextView photoStorageLocation = (TextView)infoView.findViewById(R.id.info_overlay_textview_photo_storage_location);
+        TextView photoSize = (TextView)infoView.findViewById(R.id.info_overlay_textview_photo_size);
+
+        photoName.setText(currentFile.getName());
+        photoStorageLocation.setText(currentFile.getAbsolutePath().substring(0,
+                currentFile.getAbsoluteFile().toString().lastIndexOf("/")));
+
+        String fileSize = "";
+        long size = (currentFile.length() / 1024) / 1024;
+        fileSize = size + " MB (" + (currentFile.length() / 1024) + " KB)";
+        photoSize.setText(fileSize);
+
+        mainLayoutContainer.addView(infoView);
     }
 
     private void playMovieFile(String fileLocation){
@@ -174,6 +221,13 @@ public class GalleryActivity extends Activity {
         public View getView(int position, View convertView, ViewGroup parent) {
             View v = convertView;
             LayoutInflater layoutInflater;
+
+            if (isShowingInfoOverlay){
+                if (mainLayoutContainer != null && infoView != null)
+                    mainLayoutContainer.removeView(infoView);
+
+                isShowingInfoOverlay = false;
+            }
 
             if (v == null) {
                 layoutInflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -246,46 +300,81 @@ public class GalleryActivity extends Activity {
 
     public class DeletePhoto extends AsyncTask<String, Integer, Boolean>{
 
-        private ImageView imageView;
-        private Bitmap bitmap;
-        private int imageIndex;
-
-        public DeletePhoto(){
-
-        }
+        private RelativeLayout mainLayout;
+        private View deleteView;
+        private ImageView statusImage;
+        private TextView statusText;
 
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
 
-            // Start progress bar
-
+            isShowingDeleteOverlay = true;
+            mainLayout = (RelativeLayout)findViewById(R.id.container);
+            deleteView = getLayoutInflater().inflate(R.layout.delete_overlay, null);
+            statusImage = (ImageView)deleteView.findViewById(R.id.delete_overlay_imageview_status);
+            statusText = (TextView)deleteView.findViewById(R.id.delete_overlay_textview_status);
+            mainLayout.addView(deleteView);
         }
 
         @Override
         protected Boolean doInBackground(String... params) {
 
+            try{
+                File sdcard = Environment.getExternalStorageDirectory();
 
-            return true;
+                boolean status = false;
+                Thread.sleep(1500);
 
+                File fileToRemove = new File(sdcard, "/DCIM/Camera/" + params[0]);
+                status = fileToRemove.delete();
+
+                // Update the File List
+                mFileList.clear();
+
+                File photoDirectory = new File(sdcard, "/DCIM/Camera");
+                if (photoDirectory != null){
+                    mFileList.addAll(Arrays.asList(photoDirectory.listFiles()));
+                }
+                publishProgress(1);
+
+                return status;
+            } catch(InterruptedException e){
+                return false;
+            }
         }
 
         @Override
         protected void onPostExecute(Boolean result) {
             super.onPostExecute(result);
 
-            // TODO
-            // Switch to the little "checkmark" thing like the standard delete system does
-            // Finish progress bar
-            // Remove object from mFileList
-            // Update adapter
+            AudioManager audio = (AudioManager) GalleryActivity.this.getSystemService(Context.AUDIO_SERVICE);
+            if (result){
 
+                audio.playSoundEffect(Sounds.SUCCESS);
 
+                // Had to introduce lag to make this function like other areas of Glass that delete doesn't happen instantaneously
+                try{
+                    Thread.sleep(1500);
+
+                } catch(InterruptedException e){ }
+                setupPhotoListView();
+
+            } else {
+                audio.playSoundEffect(Sounds.ERROR);
+            }
+
+            mainLayout.removeView(deleteView);
+            isShowingDeleteOverlay = false;
         }
 
         @Override
         protected void onProgressUpdate(Integer... values) {
             super.onProgressUpdate(values);
+
+            statusImage.setImageDrawable(getResources().getDrawable(R.drawable.ic_done_50));
+            statusText.setText("Success");
+
         }
     }
 }
