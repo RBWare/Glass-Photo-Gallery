@@ -2,6 +2,7 @@ package com.rbware.glass.photogallery;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -17,8 +18,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ImageView;
+import android.widget.*;
 import com.google.android.glass.widget.CardScrollAdapter;
 import com.google.android.glass.widget.CardScrollView;
 
@@ -69,6 +69,10 @@ public class GalleryActivity extends Activity {
 
             case R.id.action_play:
 
+                playMovieFile(mFileList.get(mSelectedListing).getAbsolutePath());
+//                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(mFileList.get(mSelectedListing).getAbsolutePath()));
+//                intent.setDataAndType(Uri.parse(mFileList.get(mSelectedListing).getAbsolutePath()), "video/*");
+//                startActivity(intent);
                 return true;
             case R.id.action_delete:
 
@@ -77,7 +81,18 @@ public class GalleryActivity extends Activity {
 
                 return true;
             case R.id.action_share:
-
+                Intent sharingIntent;
+                if (showPlayButtonInMenu){
+//                    sharingIntent = new Intent(Intent.ACTION_SEND);
+//                    sharingIntent.setType("image/*");
+//                    sharingIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(mFileList.get(mSelectedListing).getAbsolutePath()));
+//                    startActivity(Intent.createChooser(sharingIntent, ""));
+                } else {
+                    sharingIntent = new Intent(Intent.ACTION_MEDIA_SHARED);
+                    sharingIntent.setType("image/*");
+                    sharingIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse(mFileList.get(mSelectedListing).getAbsolutePath()));
+                    startActivity(Intent.createChooser(sharingIntent, ""));
+                }
                 return true;
             default:
                 // Nothing
@@ -127,6 +142,12 @@ public class GalleryActivity extends Activity {
         }
     }
 
+    private void playMovieFile(String fileLocation){
+        Intent videoPlayerIntent = new Intent(this, VideoPlayerActivity.class);
+        videoPlayerIntent.putExtra("videoUrl", fileLocation);
+        startActivity(videoPlayerIntent);
+    }
+
     private class UIListingCardScrollAdapter extends CardScrollAdapter {
 
         @Override
@@ -160,7 +181,15 @@ public class GalleryActivity extends Activity {
             }
 
             ImageView imageView = (ImageView)v.findViewById(R.id.imageview_photo);
+            ImageView imagePlayButton = (ImageView)v.findViewById(R.id.imageview_play_button);
             new LoadPhoto(imageView, position).execute();
+
+            if(mFileList.get(position).getName().endsWith(".mp4")){
+                // Show play button
+                imagePlayButton.setVisibility(View.VISIBLE);
+            } else {
+                imagePlayButton.setVisibility(View.INVISIBLE);
+            }
             return v;
         }
 
@@ -211,6 +240,51 @@ public class GalleryActivity extends Activity {
 
         @Override
         protected void onProgressUpdate(Object... values) {
+            super.onProgressUpdate(values);
+        }
+    }
+
+    public class DeletePhoto extends AsyncTask<String, Integer, Boolean>{
+
+        private ImageView imageView;
+        private Bitmap bitmap;
+        private int imageIndex;
+
+        public DeletePhoto(){
+
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+
+            // Start progress bar
+
+        }
+
+        @Override
+        protected Boolean doInBackground(String... params) {
+
+
+            return true;
+
+        }
+
+        @Override
+        protected void onPostExecute(Boolean result) {
+            super.onPostExecute(result);
+
+            // TODO
+            // Switch to the little "checkmark" thing like the standard delete system does
+            // Finish progress bar
+            // Remove object from mFileList
+            // Update adapter
+
+
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
             super.onProgressUpdate(values);
         }
     }

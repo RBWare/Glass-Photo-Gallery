@@ -19,4 +19,12 @@
             android:id="@+id/textview_photo_information"
             />
 
+    <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:src="@drawable/ic_music_play_50"
+            android:id="@+id/imageview_play_button"
+            />
+
 </RelativeLayout>
